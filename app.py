@@ -27,16 +27,17 @@ app = Flask(__name__)
 def welcome():
     
     """List all available api routes."""
-    print('Welcome to your trip planner')
     return (
         f"Welcome to your trip planner!<br/>"
+        f"Available Temperature date range: 2010-01-01 to 2017-08-23<br/>"
+        f"<br/>"
         f"Available Routes:<br/>"
         f"/api/v1.0/precipitation<br/>"
         f"/api/v1.0/stations<br/>"
-        f"/api/v1.0/yyyy-mm-dd;<br/>"
-        f"returns TMIN, TAVG, TMAX for all dates starting with 'yyyy-mm-dd' </br>"
-        f"/api/v1.0/yyyy-mm-dd/yyyy-mm-dd;<br/>"
-        f"returns TMIN, TAVG, TMAX for all dates in range 'yyyy-mm-dd' to 'yyyy-mm-dd' </br>"
+        f"/api/v1.0/yyyy-mm-dd<br/>"
+        f"   ---returns TMIN, TAVG, TMAX for dates after  'yyyy-mm-dd' </br>"
+        f"/api/v1.0/yyyy-mm-dd,yyyy-mm-dd<br/>"
+        f"   ---returns TMIN, TAVG, TMAX for all dates in range 'yyyy-mm-dd' to 'yyyy-mm-dd' (separated with comma)</br>"
     )
 
 @app.route('/api/v1.0/precipitation')
@@ -93,15 +94,17 @@ def tobs():
         tobs_list.append(row)
 
     return jsonify(tobs_list)
+
 @app.route('/api/v1.0/<date>')
 def start(date):
     session=Session(engine)
     """When given the start only, calculate `TMIN`, `TAVG`, and `TMAX` for all dates greater than and equal to the start date."""
     start_date = session.query(measurement.date, func.min(measurement.tobs), func.avg(measurement.tobs), func.max(measurement.tobs)).\
         filter(measurement.date >= date).\
-        all()
-    session.close()
+        group_by(measurement.date).all()
     
+    session.close()
+
     # creates JSONified list of dictionaries
     date_list = []
     for day in start_date:
@@ -114,12 +117,12 @@ def start(date):
 
     return jsonify(date_list)
 
-# @app.route('/api/v1.0/<start>/<end>')
-def range_dates(start_date, end_date):
+# @app.route('/api/v1.0/<first_date>,<last_date>')
+def range_dates(first_date, last_date):
     """Return the avg, max, min, temp over a specific time period"""
     date_range = session.query(measurement.date, func.min(measurement.tobs), func.avg(measurement.tobs), func.max(measurement.tobs)).\
-        filter(measurement.date >= start_date, measurement.date <= end_date).all()
-
+        filter(measurement.date >= first_date, measurement.date <= last_date).\
+        group_by(measurement.date).all()
     # creates JSONified list of dictionaries
     data_list = []
     for result in date_range:
